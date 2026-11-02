@@ -1,5 +1,6 @@
 -- Pints Shield Arcs: curved combat meters around your character.
 -- Right side: Power Word: Shield, Ice Barrier, Health, Mana.  Left side: Mana Shield, Combo points, Energy, Rage.
+-- The health arc also shows, in green, the healing still to come from heal-over-time spells on you.
 -- Every arc has its own settings (show/hide, icon, number, position, distance, thickness, length, colors),
 -- edited from the options window (minimap button or /sarc).
 -- Shield amounts aren't reported by the game, so each shield starts from its rank value (+ spell power share),
@@ -32,7 +33,7 @@ SA.ELEMENTS = {
              thick = 1, bg = 0.55, numSize = 14, icon = true, num = true, timer = true,
              c = { {0.10, 0.62, 0.55}, {0.50, 1.00, 0.83}, {1.00, 1.00, 1.00} } },
   HEALTH = { label = "Health", side = "right", tex = "Interface\\Icons\\INV_Potion_51",
-             thick = 1, bg = 0.35, numSize = 16, icon = false, num = true, ndx = -20,
+             thick = 1, bg = 0.35, numSize = 16, icon = false, num = true, ndx = -20, hot = true,
              c = { {0.55, 0.02, 0.02}, {0.78, 0.16, 0.16}, {1.00, 0.30, 0.30} } },
   MANA   = { label = "Mana", side = "right", tex = "Interface\\Icons\\INV_Potion_76",
              thick = 1, bg = 0.35, numSize = 16, icon = false, num = true,
@@ -47,14 +48,14 @@ SA.ELEMENTS = {
              thick = 1, bg = 0.10, numSize = 20, icon = false, num = true,
              c = { {0.50, 0.02, 0.02}, {0.75, 0.11, 0.06}, {1.00, 0.20, 0.10} } },
 }
-local SAVED_FIELDS = { "mode", "show", "thick", "bg", "numSize", "icon", "num", "timer", "ws", "dx", "dy", "dr", "ndx", "ndy", "arc", "iconSize", "c" }
+local SAVED_FIELDS = { "mode", "show", "thick", "bg", "numSize", "icon", "num", "timer", "ws", "hot", "dx", "dy", "dr", "ndx", "ndy", "arc", "iconSize", "c" }
 
 local function CopyColors(c) return { { c[1][1], c[1][2], c[1][3] }, { c[2][1], c[2][2], c[2][3] }, { c[3][1], c[3][2], c[3][3] } } end
 
 function SA.DefaultElement(key)
   local d = SA.ELEMENTS[key]
   return { mode = "auto", show = true, thick = d.thick, bg = d.bg, numSize = d.numSize, icon = d.icon, num = d.num,
-           timer = d.timer, ws = d.ws, dx = d.dx or 0, dy = 0, dr = 0, ndx = d.ndx or 0, ndy = 0,
+           timer = d.timer, ws = d.ws, hot = d.hot, dx = d.dx or 0, dy = 0, dr = 0, ndx = d.ndx or 0, ndy = 0,
            arc = nil, iconSize = nil, c = CopyColors(d.c) }
 end
 
@@ -64,6 +65,7 @@ local function InitDB()
   SA.db = db
   for k, v in pairs(SA.GENERAL) do if db[k] == nil then db[k] = v end end
   db.learn = db.learn or {}
+  db.hotTick = db.hotTick or {}     -- last tick size seen for each HoT rank (spell ID)
   db.minimap = db.minimap or { hide = false }
   db.el = db.el or {}
   for _, key in ipairs(SA.ORDER) do
@@ -122,6 +124,10 @@ local function NewPiece(key)
     p.bg[i] = frame:CreateTexture(nil, "BACKGROUND")
     p.fg[i] = frame:CreateTexture(nil, "ARTWORK")
   end
+  if key == "HEALTH" then                                 -- incoming heal-over-time segment
+    p.hot = {}
+    for i = 1, #p.slots do p.hot[i] = frame:CreateTexture(nil, "BORDER") end
+  end
   p.icon = frame:CreateTexture(nil, "OVERLAY")
   p.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
   p.text = frame:CreateFontString(nil, "OVERLAY")
@@ -138,7 +144,7 @@ end
 
 local function HidePiece(p)
   if not p.shown then return end
-  for i = 1, #p.bg do p.bg[i]:Hide(); p.fg[i]:Hide() end
+  for i = 1, #p.bg do p.bg[i]:Hide(); p.fg[i]:Hide(); if p.hot then p.hot[i]:Hide() end end
   p.icon:Hide(); p.text:Hide()
   if p.ttext then p.ttext:Hide() end
   if p.wtext and not p.keepWS then p.wtext:Hide() end
@@ -154,7 +160,7 @@ local function LayoutPiece(key, r, th, extra)
   for i, t in ipairs(p.slots) do
     local a = Angle(d.side, t, arcDeg)
     local x, y = cx + r * cos(a), cy + r * sin(a)
-    for _, tx in ipairs({ p.bg[i], p.fg[i] }) do
+    for _, tx in ipairs({ p.bg[i], p.fg[i], p.hot and p.hot[i] or nil }) do
       tx:ClearAllPoints()
       tx:SetPoint("CENTER", frame, "CENTER", x, y)
       if tx.SetRotation then tx:SetRotation(a) end
@@ -162,6 +168,7 @@ local function LayoutPiece(key, r, th, extra)
     p.bg[i]:SetColorTexture(0, 0, 0, e.bg)
     p.bg[i]:SetSize(th + 2, th + 2)
     p.fg[i]:SetSize(th, th)
+    if p.hot then p.hot[i]:SetSize(th, th); p.hot[i]:SetColorTexture(0.25, 0.95, 0.35, 0.55) end
     if key == "COMBO" then
       p.fg[i]:SetColorTexture(Grad(e.c, (p.pip[i] - 1) / (MAXP - 1)))
     else
@@ -252,8 +259,8 @@ local function ScanAuras()
   end
 end
 
-local function OnAbsorb()
-  local t = { CombatLogGetCurrentEventInfo() }
+local function OnAbsorb(t)
+  t = t or { CombatLogGetCurrentEventInfo() }
   if t[2] ~= "SPELL_ABSORBED" or t[8] ~= pguid then return end
   local amt = t[#t]
   if type(amt) ~= "number" then amt = t[#t - 1] end
@@ -266,6 +273,58 @@ local function OnAbsorb()
       end
     end
   end
+end
+
+---------------------------------------------------------------- incoming heals over time (Renew, Rejuvenation, Regrowth...)
+-- The game doesn't say how much a HoT will heal, so each one's tick size and tick interval are learned from the
+-- combat log. Projected healing = last tick x ticks left before the aura runs out.
+local TICK = {}          -- [spellId .. ":" .. casterGUID] = { amt, last, every }
+local hotAuras = {}      -- HoT auras on you right now: { spellId, src, exp }
+
+local function ScanHoTs()
+  wipe(hotAuras)
+  if not (C_UnitAuras and C_UnitAuras.GetAuraDataByIndex) then return end
+  for i = 1, 40 do
+    local a = C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL")
+    if not a then break end
+    local id = a.spellId
+    if id and a.expirationTime and a.expirationTime > 0 then
+      local src = a.sourceUnit and UnitGUID(a.sourceUnit) or "?"
+      -- only auras we've seen heal (or have learned before) count as HoTs
+      if TICK[id .. ":" .. src] or db.hotTick[id] then hotAuras[#hotAuras + 1] = { id = id, src = src, exp = a.expirationTime } end
+    end
+  end
+end
+
+local function OnPeriodicHeal(t)
+  local id, amt = t[12], t[15]
+  if type(id) ~= "number" or type(amt) ~= "number" then return end
+  local k = id .. ":" .. (t[4] or "?")
+  local now = GetTime()
+  local e = TICK[k]
+  if not e then e = {}; TICK[k] = e end
+  if e.last then
+    local gap = now - e.last
+    if gap > 0.8 and gap < 6 then e.every = gap end
+  end
+  e.amt, e.last = amt, now
+  db.hotTick[id] = { amt = amt, every = e.every or (db.hotTick[id] and db.hotTick[id].every) or 3 }
+  ScanHoTs()
+end
+
+local function IncomingHoT()
+  local now, total = GetTime(), 0
+  for _, h in ipairs(hotAuras) do
+    local left = h.exp - now
+    if left > 0 then
+      local e = TICK[h.id .. ":" .. h.src]
+      local learned = db.hotTick[h.id]
+      local amt = (e and e.amt) or (learned and learned.amt)
+      local every = (e and e.every) or (learned and learned.every) or 3
+      if amt then total = total + amt * floor(left / every + 0.05) end
+    end
+  end
+  return total
 end
 
 local wsName
@@ -384,6 +443,24 @@ local function DrawBar(key, show, cur, mx)
   return true
 end
 
+-- green segment after the health fill: healing still to come from HoTs, capped at your missing health
+local function DrawHoT(drawn, h, hm)
+  local p, e = A.HEALTH, db.el.HEALTH
+  local inc = 0
+  if drawn and e.hot and hm > 0 then
+    if Preview("HEALTH") then inc = hm * 0.15
+    elseif h < hm then inc = min(IncomingHoT(), hm - h) end
+  end
+  local n = #p.slots
+  local from = floor((hm > 0 and h / hm or 0) * n + 0.5)
+  local to = (inc > 0) and floor((h + inc) / hm * n + 0.5) or from
+  if inc > 0 and to == from then to = from + 1 end        -- always show at least one segment
+  for i = 1, n do
+    if drawn and i > from and i <= to then p.hot[i]:Show() else p.hot[i]:Hide() end
+  end
+  if drawn and e.num and inc >= 1 then p.text:SetText(h .. " |cff40ff40+" .. floor(inc + 0.5) .. "|r") end
+end
+
 local function ComboPoints()
   local p = 0
   if GetComboPoints then p = GetComboPoints("player", "target") or 0 end
@@ -410,7 +487,8 @@ local function Tick()
   -- health
   local h, hm = UnitHealth("player") or 0, UnitHealthMax("player") or 0
   local showHp = Preview("HEALTH") or (hm > 0 and (combat or h < hm or anyShield or showMana))
-  DrawBar("HEALTH", showHp, h, hm > 0 and hm or 1)
+  local drawn = DrawBar("HEALTH", showHp, h, hm > 0 and hm or 1)
+  DrawHoT(drawn, h, hm)
   -- combo + energy (rogues, cat form)
   local ptype = PowerType()
   local energyUser = CLASS == "ROGUE" or (CLASS == "DRUID" and ptype == 3)
@@ -481,11 +559,12 @@ frame:SetScript("OnEvent", function(self, event, arg1)
     self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
   elseif event == "PLAYER_ENTERING_WORLD" then
     pguid = UnitGUID("player")
-    ScanAuras(); layoutDirty = true; Tick()
+    ScanAuras(); ScanHoTs(); layoutDirty = true; Tick()
   elseif event == "UNIT_AURA" then
-    ScanAuras(); Tick()
+    ScanAuras(); ScanHoTs(); Tick()
   elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
-    OnAbsorb()
+    local t = { CombatLogGetCurrentEventInfo() }
+    if t[2] == "SPELL_PERIODIC_HEAL" and t[8] == pguid then OnPeriodicHeal(t) else OnAbsorb(t) end
   end
 end)
 

@@ -1,4 +1,4 @@
-Pints Shield Arcs v3.1 - curved combat meters around your character
+Pints Shield Arcs v3.2 - curved combat meters around your character
 (WoW Classic Era / Hardcore / Forever)
 
 INSTALL
@@ -7,7 +7,7 @@ INSTALL
 
 WHAT IT SHOWS (picked automatically for your class)
   Right side: Power Word: Shield (absorb left, countdown, Weakened Soul timer), Ice Barrier,
-              red Health bar, blue Mana bar (mana users).
+              red Health bar (with incoming heal-over-time healing shown in green), blue Mana bar (mana users).
   Left side:  Mana Shield (mages), Combo points + Energy (rogues, Cat Form),
               Rage (warriors, Bear Form).
 
@@ -15,7 +15,7 @@ OPTIONS  (minimap button: left-click = options, right-click = preview all;  /sar
   Overall page: move and size the whole display.
   One page per arc:
     - Show: Always on / In combat or when changing / Always off
-    - Show icon, show number (plus countdown and Weakened Soul timer on shields)
+    - Show icon, show number (plus countdown and Weakened Soul timer on shields, Incoming HoTs on Health)
     - Move left/right and up/down, distance from center, thickness, arc length,
       icon size, number size and number position, empty-segment opacity
     - Bottom / middle / top colors (color picker), "Default colors", "Reset this arc"

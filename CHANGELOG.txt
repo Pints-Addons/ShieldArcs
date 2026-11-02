@@ -1,0 +1,10 @@
+Pint's Shield Arcs - Changelog
+
+v3.2
+- Health arc: when you're not at full health and a heal-over-time is on you (Renew, Rejuvenation, Regrowth...),
+  a green segment shows the healing still to come, and the number shows it too (e.g. 600 +300).
+  It's capped at your missing health. Turn it on or off with "Incoming HoTs" on the Health page of the options.
+- The game doesn't report HoT amounts, so each HoT's tick size is learned from its first tick and remembered.
+
+v3.1
+- Earlier release.

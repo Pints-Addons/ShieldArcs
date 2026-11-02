@@ -134,6 +134,7 @@ local function ElementPage(parent, key)
   local checks = { { "Show icon", "icon" }, { "Show number", "num" } }
   if def.shield then checks[#checks + 1] = { "Countdown", "timer" } end
   if key == "PWS" then checks[#checks + 1] = { "Weakened Soul", "ws" } end
+  if key == "HEALTH" then checks[#checks + 1] = { "Incoming HoTs", "hot" } end
   for i, c in ipairs(checks) do
     local get, set = C(c[1], c[2])
     items[#items + 1] = Check(parent, 10 + (i - 1) * 110, -62, c[1], get, set)
