@@ -25,3 +25,7 @@ OPTIONS  (minimap button: left-click = options, right-click = preview all;  /sar
 NOTES
   The game doesn't report shield amounts, so absorbs are estimated from spell rank + spell power,
   minus damage absorbed from the combat log, and the real size is learned when a shield breaks.
+
+FEEDBACK
+  Report a bug or suggest an idea: https://github.com/Pints-Addons/ShieldArcs/issues
+  Source code: https://github.com/Pints-Addons/ShieldArcs

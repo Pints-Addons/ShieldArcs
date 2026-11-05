@@ -1,5 +1,10 @@
 Pint's Shield Arcs - Changelog
 
+v3.3
+- Works on WoW Forever (the modern game client). Classic Era is unchanged.
+- Health, mana, energy, rage and combo arcs work even though the game hides the exact numbers.
+- Shield arc shows your total absorbs. Heal-over-time segments and per-shield details aren't available there.
+
 v3.2
 - Health arc: when you're not at full health and a heal-over-time is on you (Renew, Rejuvenation, Regrowth...),
   a green segment shows the healing still to come, and the number shows it too (e.g. 600 +300).

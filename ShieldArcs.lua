@@ -7,6 +7,13 @@
 -- subtracts every SPELL_ABSORBED from the combat log, and learns its real size when it breaks.
 
 local ADDON = ...
+-- Compatibility: WoW Forever runs on the modern game client, where these older functions moved or were renamed.
+local GetSpellTexture = GetSpellTexture or (C_Spell and C_Spell.GetSpellTexture)
+local GetSpellInfo = GetSpellInfo or function(s)
+	local i = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(s)
+	if i then return i.name, nil, i.iconID, i.castTime, i.minRange, i.maxRange, i.spellID, i.originalIconID end
+end
+
 local _, CLASS = UnitClass("player")
 local sin, cos, rad, floor, max, min = math.sin, math.cos, math.rad, math.floor, math.max, math.min
 
@@ -389,6 +396,7 @@ end
 local function Fill(p, frac)
   local n = #p.slots
   local filled = floor(frac * n + 0.5)
+  if p.alphaSet then for i = 1, n do p.fg[i]:SetAlpha(1); p.bg[i]:SetAlpha(1) end; p.icon:SetAlpha(1); p.text:SetAlpha(1); p.alphaSet = nil end
   for i = 1, n do
     p.bg[i]:Show()
     if i <= filled then p.fg[i]:Show() else p.fg[i]:Hide() end
@@ -468,8 +476,131 @@ local function ComboPoints()
   return p
 end
 
+---------------------------------------------------------------- the modern game client (WoW Forever)
+-- There your health, power and absorbs are "secret": the game shows them but add-ons can't do maths on them.
+-- So each segment of an arc gets a tiny curve that the game evaluates for us: 0 below the segment's point, 1 from it,
+-- and that result becomes the segment's see-through level. No numbers pass through our hands.
+local SECRET = type(issecretvalue) == "function"
+local function IsSecret(v) return SECRET and issecretvalue(v) end
+local function Known(v) if IsSecret(v) then return nil end return v end
+
+local function StepCurve(at)   -- 0 below `at`, 1 from `at` on
+  local c = C_CurveUtil.CreateCurve()
+  if c.SetType and Enum and Enum.LuaCurveType and Enum.LuaCurveType.Step then
+    c:SetType(Enum.LuaCurveType.Step)
+    c:AddPoint(0, 0); c:AddPoint(at, 1)
+  else
+    c:AddPoint(0, 0); c:AddPoint(max(0, at - 0.0005), 0); c:AddPoint(at, 1); c:AddPoint(1, 1)
+  end
+  return c
+end
+local function Curves(p)
+  if not p.curves then
+    p.curves = {}
+    for i, t in ipairs(p.slots) do
+      local at = p.pip and p.pip[i] and ((p.pip[i] - 0.5) / MAXP) or t
+      p.curves[i] = StepCurve(at)
+    end
+  end
+  return p.curves
+end
+
+-- draw one arc whose fill only the game knows: get(curve) returns the game's 0/1 for that segment
+local function SecretArc(key, show, get, number)
+  local p, e = A[key], db.el[key]
+  if Off(key) then show = false elseif Always(key) then show = true end
+  if not show then HidePiece(p); return false end
+  local cv = Curves(p)
+  for i = 1, #p.slots do
+    p.bg[i]:Show(); p.fg[i]:Show()
+    local ok = pcall(p.fg[i].SetAlpha, p.fg[i], get(cv[i]))
+    if not ok then p.fg[i]:Hide() end
+  end
+  if p.hot then for i = 1, #p.hot do p.hot[i]:Hide() end end
+  p.alphaSet, p.shown = true, true
+  ShowExtras(key, number)
+  return true
+end
+
+-- shields: the game gives only the total absorb on you, so the Power Word: Shield arc shows that total
+-- against the biggest shield you can cast (or a quarter of your health)
+local absCap, absCurves, anyCurve, absorbBroken
+local function AbsorbCap()
+  local best = 0
+  for _, key in ipairs(SHIELD_KEYS) do
+    for id, amt in pairs(SH[key].ranks) do if IsPlayerSpell and IsPlayerSpell(id) and amt > best then best = amt end end
+  end
+  if best == 0 then best = floor((Known(UnitHealthMax("player")) or 400) * 0.25) end
+  return max(best, 1)
+end
+local function SecretAbsorb()
+  local p = A.PWS
+  if absorbBroken or Off("PWS") or not UnitGetTotalAbsorbs then HidePiece(p); return end
+  local cap = AbsorbCap()
+  if cap ~= absCap then
+    absCap, absCurves = cap, {}
+    for i, t in ipairs(p.slots) do absCurves[i] = StepCurve(t * cap) end
+    anyCurve = StepCurve(0.5)
+  end
+  local abs = UnitGetTotalAbsorbs("player")
+  local ok, any = pcall(anyCurve.Evaluate, anyCurve, abs)
+  if not ok then absorbBroken = true; HidePiece(p); return end   -- this client won't evaluate secrets: no shield arc
+  for i = 1, #p.slots do
+    p.bg[i]:Show(); p.fg[i]:Show()
+    p.bg[i]:SetAlpha(any)
+    local ok2, v = pcall(absCurves[i].Evaluate, absCurves[i], abs)
+    if ok2 then p.fg[i]:SetAlpha(v) else p.fg[i]:Hide() end
+  end
+  local e = db.el.PWS
+  if e.icon then p.icon:Show(); p.icon:SetAlpha(any) else p.icon:Hide() end
+  if e.num then p.text:SetText(AbbreviateNumbers and AbbreviateNumbers(abs) or abs); p.text:SetAlpha(any); p.text:Show() else p.text:Hide() end
+  if p.ttext then p.ttext:Hide() end
+  if p.wtext then p.wtext:Hide() end
+  p.alphaSet, p.shown = true, true
+end
+
+local function TickSecret()
+  local ring = Preview("IB") and true or false
+  if layoutDirty or ring ~= (lastRing and true or false) then Layout() end
+  local combat = InCombatLockdown()
+  -- shields (preview uses the usual drawing)
+  if Preview("PWS") then DrawShield("PWS") else SecretAbsorb() end
+  for _, key in ipairs({ "IB", "MS" }) do if Preview(key) then DrawShield(key) else HidePiece(A[key]) end end
+  -- mana
+  local mx = Known(UnitPowerMax("player", 0)) or 0
+  local isMana = PowerType() == 0
+  local showMana = isMana and mx > 0 and combat
+  if Preview("MANA") then DrawBar("MANA", true, 700, 1000)
+  else SecretArc("MANA", showMana, function(c) return UnitPowerPercent("player", 0, false, c) end, UnitPower("player", 0)) end
+  -- health
+  if Preview("HEALTH") then
+    local drawn = DrawBar("HEALTH", true, 850, 1000); DrawHoT(drawn, 850, 1000)
+  else
+    SecretArc("HEALTH", combat or showMana, function(c) return UnitHealthPercent("player", true, c) end, UnitHealth("player"))
+  end
+  -- combo + energy (rogues, cat form)
+  local ptype = PowerType()
+  local energyUser = CLASS == "ROGUE" or (CLASS == "DRUID" and ptype == 3)
+  local target = UnitExists("target") and Known(UnitCanAttack("player", "target")) and not Known(UnitIsDead("target"))
+  local comboOn = energyUser and target and true or false
+  local COMBO_TYPE = Enum and Enum.PowerType and Enum.PowerType.ComboPoints or 4
+  if Preview("COMBO") then
+    local p = A.COMBO
+    Fill(p, 0) ; for i = 1, #p.slots do p.bg[i]:Show(); if p.pip[i] <= 3 then p.fg[i]:Show() else p.fg[i]:Hide() end end
+    ShowExtras("COMBO", 3)
+  else
+    SecretArc("COMBO", comboOn, function(c) return UnitPowerPercent("player", COMBO_TYPE, false, c) end, UnitPower("player", COMBO_TYPE))
+  end
+  if Preview("ENERGY") then DrawBar("ENERGY", true, 60, 100)
+  else SecretArc("ENERGY", comboOn, function(c) return UnitPowerPercent("player", 3, false, c) end, UnitPower("player", 3)) end
+  -- rage (warriors, bear form)
+  if Preview("RAGE") then DrawBar("RAGE", true, 45, 100)
+  else SecretArc("RAGE", ptype == 1 and combat, function(c) return UnitPowerPercent("player", 1, false, c) end, UnitPower("player", 1)) end
+end
+
 local function Tick()
   if not db then return end
+  if SECRET then return TickSecret() end
   local ring = SH.IB.active or Preview("IB")
   if layoutDirty or ring ~= lastRing then Layout() end
   local combat = InCombatLockdown()
@@ -556,12 +687,14 @@ frame:SetScript("OnEvent", function(self, event, arg1)
     self:UnregisterEvent("ADDON_LOADED")
     self:RegisterEvent("PLAYER_ENTERING_WORLD")
     self:RegisterUnitEvent("UNIT_AURA", "player")
-    self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+    if not SECRET then self:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED") end   -- add-ons can't read it on the modern client
   elseif event == "PLAYER_ENTERING_WORLD" then
     pguid = UnitGUID("player")
-    ScanAuras(); ScanHoTs(); layoutDirty = true; Tick()
+    if not SECRET then ScanAuras(); ScanHoTs() end
+    layoutDirty = true; Tick()
   elseif event == "UNIT_AURA" then
-    ScanAuras(); ScanHoTs(); Tick()
+    if not SECRET then ScanAuras(); ScanHoTs() end
+    Tick()
   elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
     local t = { CombatLogGetCurrentEventInfo() }
     if t[2] == "SPELL_PERIODIC_HEAL" and t[8] == pguid then OnPeriodicHeal(t) else OnAbsorb(t) end
