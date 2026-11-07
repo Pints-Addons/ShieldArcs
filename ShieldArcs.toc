@@ -2,9 +2,10 @@
 ## Title: Pints Shield Arcs
 ## Notes: Curved meters around your character - shields, health and mana on the right; Mana Shield, combo points, energy or rage on the left. Every arc is configurable from the minimap button or /sarc.
 ## Author: Jake (built with Claude)
-## Version: 3.3
+## Version: 3.4
 ## X-Curse-Project-ID: 1776708
 ## SavedVariables: ShieldArcsDB
 
 ShieldArcs.lua
 Options.lua
+Ancestral.lua

@@ -705,8 +705,13 @@ SLASH_SHIELDARCS1 = "/sarc"
 SLASH_SHIELDARCS2 = "/shieldarcs"
 SLASH_SHIELDARCS3 = "/carc"
 SlashCmdList.SHIELDARCS = function(msg)
-  msg = (msg or ""):lower():match("^%s*(%S*)")
-  if msg == "test" then
+  local full = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+  msg = full:match("^(%S*)")
+  if msg == "af" or msg == "ancestral" then
+    if not SA.AncestralToggle then print("|cff66ccffPints Shield Arcs|r the Ancestral Fortitude icon is for shamans."); return end
+    if full:match("test$") then SA.AncestralTest() else SA.AncestralToggle() end
+    return
+  elseif msg == "test" then
     SA.SetTest(not testMode)
     print("|cff66ccffPints Shield Arcs|r test mode " .. (testMode and "ON" or "OFF"))
   elseif msg == "reset" then

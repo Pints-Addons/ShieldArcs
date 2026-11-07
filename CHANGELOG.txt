@@ -1,5 +1,12 @@
 Pint's Shield Arcs - Changelog
 
+v3.4
+- Shamans: when your Ancestral Healing gives someone Ancestral Fortitude (+25% armor for 15 seconds after your healing
+  spell crits), an icon sits at the top of the arcs with their name and the seconds left (up to three at once).
+  /sarc af turns it on or off; /sarc af test shows an example.
+  Classic Era reads it from the combat log. WoW Forever closes the combat log to add-ons, so there the buff is looked
+  for on your group members and target - the game may hide that in a fight.
+
 v3.3
 - Works on WoW Forever (the modern game client). Classic Era is unchanged.
 - Health, mana, energy, rage and combo arcs work even though the game hides the exact numbers.
