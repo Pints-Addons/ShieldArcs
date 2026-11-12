@@ -1,5 +1,11 @@
 Pint's Shield Arcs - Changelog
 
+v3.5
+- Clearcasting: when you go Clearcasting (Elemental Focus - your next damage spell is free; also Arcane Concentration,
+  Holy Concentration and Omen of Clarity), a glowing icon sits at the top of the arcs with the seconds left.
+  /sarc cc turns it on or off; /sarc cc test shows an example. On WoW Forever, when the game hides your buffs in a fight,
+  a spell that suddenly costs no mana shows it instead.
+
 v3.4
 - Shamans: when your Ancestral Healing gives someone Ancestral Fortitude (+25% armor for 15 seconds after your healing
   spell crits), an icon sits at the top of the arcs with their name and the seconds left (up to three at once).

@@ -711,6 +711,10 @@ SlashCmdList.SHIELDARCS = function(msg)
     if not SA.AncestralToggle then print("|cff66ccffPints Shield Arcs|r the Ancestral Fortitude icon is for shamans."); return end
     if full:match("test$") then SA.AncestralTest() else SA.AncestralToggle() end
     return
+  elseif msg == "cc" or msg == "clearcasting" then
+    if not SA.ClearcastToggle then print("|cff66ccffPints Shield Arcs|r the Clearcasting icon is for shamans, mages, priests and druids."); return end
+    if full:match("test$") then SA.ClearcastTest() else SA.ClearcastToggle() end
+    return
   elseif msg == "test" then
     SA.SetTest(not testMode)
     print("|cff66ccffPints Shield Arcs|r test mode " .. (testMode and "ON" or "OFF"))
