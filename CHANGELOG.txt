@@ -1,5 +1,9 @@
 Pint's Shield Arcs - Changelog
 
+v3.7
+- WoW Forever: the purge icon keeps working in a fight, when the game hides what each buff is - it counts the buffs
+  the game says you can take off and shows the first one's icon (its name shows again out of combat).
+
 v3.6
 - Purge: when your target is an enemy with a magic buff you can take off, an icon of your purge spell (Purge, Dispel
   Magic, Devour Magic) sits at the bottom of the arcs, with how many such buffs it has and the first one's name.

@@ -43,19 +43,37 @@ local function Place()
   local bottom = (db and db.radius or 150) * math.sin(math.rad(db and db.arc or 42)) + 14
   b:ClearAllPoints(); b:SetPoint("TOP", _G.ShieldArcsFrame or UIParent, "CENTER", 0, -(bottom + 30))
 end
-local function Show(n, name, icon)
+local function Show(n, name, icon, hasIcon)
   if not On() then b:Hide(); return end
   Place()
   b.count:SetText(n > 1 and n or "")
   b.label:SetText("|cffff6050" .. P_NAME .. "|r" .. (name and (": |cffffffff" .. name .. "|r") or ""))
-  b.buff:SetTexture(icon); b.buff:SetShown(icon and true or false)
+  if hasIcon then pcall(b.buff.SetTexture, b.buff, icon); b.buff:Show() else b.buff:Hide() end
   if not b:IsShown() then b:Show(); pulse:Play() end
 end
 local function Hide() pulse:Stop(); b:Hide() end
 
 -- the target's magic buffs: how many, and the first one's name and icon
+-- In a fight WoW Forever hides what each buff is, but it still lists the ones YOU can take off (it filters them itself):
+-- count those, and show the first one's icon (the game draws it even when it won't tell us what it is)
+local function ScanHidden()
+  local GetAura = C_UnitAuras and C_UnitAuras.GetAuraDataByIndex
+  if not (SECRET and GetAura) then return nil end
+  local ok, first = pcall(GetAura, "target", 1, "HELPFUL")
+  if not ok or first == nil or not (IsSecret(first) or IsSecret(first.dispelName) or IsSecret(first.name)) then return nil end
+  local n, icon = 0, nil
+  for i = 1, 40 do
+    local okD, d = pcall(GetAura, "target", i, "HELPFUL|RAID_PLAYER_DISPELLABLE")
+    if not okD or d == nil or IsSecret(d) then break end
+    n = n + 1
+    if n == 1 then icon = d.icon end
+  end
+  return n, nil, icon, n > 0
+end
 local function Scan()
   if not UnitExists("target") or not UnitCanAttack("player", "target") or UnitIsDeadOrGhost("target") then return 0 end
+  local hn, hname, hicon, hhas = ScanHidden()
+  if hn then return hn, hname, hicon, hhas end
   local n, name, icon = 0
   local GetAura = C_UnitAuras and C_UnitAuras.GetAuraDataByIndex
   for i = 1, 40 do
@@ -74,13 +92,13 @@ local function Scan()
       if not name and not IsSecret(nm) then name, icon = nm, (not IsSecret(ic)) and ic or nil end
     end
   end
-  return n, name, icon
+  return n, name, icon, icon ~= nil
 end
 
 local function Check()
   if not On() then Hide(); return end
-  local n, name, icon = Scan()
-  if n > 0 then Show(n, name, icon) else Hide() end
+  local n, name, icon, has = Scan()
+  if n > 0 then Show(n, name, icon, has) else Hide() end
 end
 
 local ev = CreateFrame("Frame")
@@ -90,7 +108,7 @@ pcall(ev.RegisterEvent, ev, "PLAYER_ENTERING_WORLD")
 ev:SetScript("OnEvent", Check)
 
 -- /sarc purge: on or off   /sarc purge test: an example
-SA.PurgeTest = function() Show(2, "Power Word: Shield", "Interface\\Icons\\Spell_Holy_PowerWordShield") end
+SA.PurgeTest = function() Show(2, "Power Word: Shield", "Interface\\Icons\\Spell_Holy_PowerWordShield", true) end
 SA.PurgeToggle = function()
   SA.db.purge = (SA.db.purge == false) and true or false
   print("|cff66ccffPints Shield Arcs|r purge icon " .. (SA.db.purge and "on." or "off."))
