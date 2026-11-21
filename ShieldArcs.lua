@@ -715,6 +715,10 @@ SlashCmdList.SHIELDARCS = function(msg)
     if not SA.ClearcastToggle then print("|cff66ccffPints Shield Arcs|r the Clearcasting icon is for shamans, mages, priests and druids."); return end
     if full:match("test$") then SA.ClearcastTest() else SA.ClearcastToggle() end
     return
+  elseif msg == "purge" then
+    if not SA.PurgeToggle then print("|cff66ccffPints Shield Arcs|r the purge icon is for shamans, priests and warlocks."); return end
+    if full:match("test$") then SA.PurgeTest() else SA.PurgeToggle() end
+    return
   elseif msg == "test" then
     SA.SetTest(not testMode)
     print("|cff66ccffPints Shield Arcs|r test mode " .. (testMode and "ON" or "OFF"))

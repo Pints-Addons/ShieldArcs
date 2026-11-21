@@ -1,5 +1,10 @@
 Pint's Shield Arcs - Changelog
 
+v3.6
+- Purge: when your target is an enemy with a magic buff you can take off, an icon of your purge spell (Purge, Dispel
+  Magic, Devour Magic) sits at the bottom of the arcs, with how many such buffs it has and the first one's name.
+  /sarc purge turns it on or off; /sarc purge test shows it.
+
 v3.5
 - Clearcasting: when you go Clearcasting (Elemental Focus - your next damage spell is free; also Arcane Concentration,
   Holy Concentration and Omen of Clarity), a glowing icon sits at the top of the arcs with the seconds left.
